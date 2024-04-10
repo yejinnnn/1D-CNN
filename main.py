@@ -3,125 +3,112 @@
 # Press Shift+F10 to execute it or replace it with your code.
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
 
+
+import os
+
+import ads as ads
+import categorical as categorical
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+import subset as subset
+from numpy import size, floor, ceil, zeros
+from numpy.matlib import rand
+from pandas._libs.hashtable import ismember
+
+from scipy.io import wavfile
+from glob import glob
+from tqdm import tqdm
+
+import matplotlib
+
+sns.set_style('darkgrid')
+
+def data_loader(files):
+    out = []
+    for file in tqdm(files):
+        fs, data = wavfile.read(file)
+        out.append(data)
+    out = np.array(out)
+    return out
+
+
+# 데이터 불러오기
+x_data = glob('./rsc/train/*.raw')
+x_data = data_loader(x_data)
+
+
+fs, data = wavfile.read('C:/Users/user/Desktop/연구실/데이터/google_speech/google_speech/train/bird/00f0204f_nohash_0.wav')
+data = np.array(data)
+
+plt.plot(data)
+
+
+import librosa.display
 import librosa
 
-y , sr = librosa.load('C:/Users/user/Desktop/google_speech/train/bed/00f0204f_nohash_0.wav') # librosa.load() : 오디오 파일을 로드한다.
+sig, sr = librosa.load('C:/Users/user/Desktop/연구실/데이터/google_speech/google_speech/train/bird/00f0204f_nohash_0.wav')
 
-print(y)
-print(len(y))
-print('Sampling rate (Hz): %d' %sr)
-print('Audio length (seconds): %.2f' % (len(y) / sr)) #음악의 길이(초) = 음파의 길이/Sampling rate
+plt.figure()
+librosa.display.waveplot(sig, sr, alpha=0.5)
+plt.xlabel("Time (s)")
+plt.ylabel("Amplitude")
+plt.title("Waveform")
 
-import IPython.display as ipd
-ipd.Audio(y, rate=sr)
+fft = np.fft.fft(sig)
 
-import matplotlib.pyplot as plt
-import librosa.display
+magnitude = np.abs(fft)
 
-plt.figure(figsize =(16,6))
-librosa.display.waveplot(y=y,sr=sr)
+f = np.linspace(0,sr,len(magnitude))
 
-import numpy as np
+left_spectrum = magnitude[:int(len(magnitude) / 2)]
+left_f = f[:int(len(magnitude) / 2)]
 
-D = np.abs(librosa.stft(y, n_fft=2048, hop_length=512)) #n_fft : window size / 이 때, 음성의 길이를 얼마만큼으로 자를 것인가? 를 window라고 부른다.
+plt.figure()
+plt.plot(left_f, left_spectrum)
+plt.xlabel("Frequency")
+plt.ylabel("Magnitude")
+plt.title("Power spectrum")
 
+hop_length = 256
+n_fft = 1024
 
-print(D.shape)
+hop_length_duration = float(hop_length) / sr
+n_fft_duration = float(n_fft) / sr
 
-plt.figure(figsize=(16,6))
-plt.plot(D)
+stft = librosa.stft(sig, n_fft=n_fft, hop_length=hop_length)
 
+magnitude = np.abs(stft)
 
-DB = librosa.amplitude_to_db(D, ref=np.max) #amplitude(진폭) -> DB(데시벨)로 바꿔라
+log_spectrogram = librosa.amplitude_to_db(magnitude)
 
-plt.figure(figsize=(16,6))
-librosa.display.specshow(DB,sr=sr, hop_length=512, x_axis='time', y_axis='log')
-plt.colorbar()
+plt.figure()
+librosa.display.specshow(log_spectrogram, sr=sr, hop_length=hop_length)
+plt.xlabel("Time")
+plt.ylabel("Frequency")
+plt.colorbar(format="%+2.0f dB")
+plt.title("Spectrogram (dB)")
 
+fs = 16e3;
 
-S = librosa.feature.melspectrogram(y, sr=sr)
-S_DB = librosa.amplitude_to_db(S, ref=np.max)
+segmentDuration = 1;
+frameDuration = 0.025;
+hopDuration = 0.010;
 
-plt.figure(figsize=(16,6))
-librosa.display.specshow(S_DB, sr=sr,hop_length=512, x_axis='time',y_axis='log')
-plt.colorbar()
+segmentSamples = round(segmentDuration*fs);
+frameSamples = round(frameDuration*fs);
+hopSamples = round(hopDuration*fs);
+overlapSamples = frameSamples - hopSamples;
 
+FFTLength = 512;
+numBands = 50;
 
-y, sr = librosa.load('C:/Users/user/Desktop/google_speech/train/bed/00f0204f_nohash_0.wav')
-y, _ = librosa.effects.trim(y)
+x = os.read(ads.Train);
 
-S = librosa.feature.melspectrogram(y, sr=sr)
-S_DB = librosa.amplitude_to_db(S, ref=np.max)
+numSamples = size(x,1);
 
-plt.figure(figsize=(16,6))
-librosa.display.specshow(S_DB, sr=sr,hop_length=512, x_axis='time',y_axis='log')
-plt.colorbar()
+numToPadFront = floor( (segmentSamples - numSamples)/2 );
+numToPadBack = ceil( (segmentSamples - numSamples)/2 );
 
-
-tempo , _ = librosa.beat.beat_track(y,sr=sr)
-print(tempo)
-
-zero_crossings = librosa.zero_crossings(y, pad=False)
-
-print(zero_crossings)
-print(sum(zero_crossings)) # 음 <-> 양 이동한 횟수
-
-n0 = 9000
-n1 = 9040
-
-plt.figure(figsize=(16,6))
-plt.plot(y[n0:n1])
-plt.grid()
-
-
-zero_crossings = librosa.zero_crossings(y[n0:n1], pad=False) #n0 ~ n1 사이 zero crossings
-print(sum(zero_crossings))
-
-y_harm, y_perc = librosa.effects.hpss(y)
-
-plt.figure(figsize=(16,6))
-plt.plot(y_harm, color='b')
-plt.plot(y_perc, color='r')
-
-
-spectral_centroids = librosa.feature.spectral_centroid(y, sr=sr)[0]
-
-#Computing the time variable for visualization
-frames = range(len(spectral_centroids))
-
-# Converts frame counts to time (seconds)
-t = librosa.frames_to_time(frames)
-
-import sklearn
-def normalize(x, axis=0):
-  return sklearn.preprocessing.minmax_scale(x, axis=axis)    #sk.minmax_scale() : 최대 최소를 0 ~ 1 로 맞춰준다.
-
-plt.figure(figsize=(16,6))
-librosa.display.waveplot(y, sr=sr, alpha=0.5, color='b')
-plt.plot(t, normalize(spectral_centroids), color='r')
-
-
-spectral_rolloff = librosa.feature.spectral_rolloff(y, sr=sr)[0]
-
-plt.figure(figsize=(16,6))
-librosa.display.waveplot(y,sr=sr,alpha=0.5,color='b')
-plt.plot(t, normalize(spectral_rolloff),color='r')
-
-
-mfccs = librosa.feature.mfcc(y, sr=sr)
-mfccs = normalize(mfccs,axis=1)
-
-print('mean: %.2f' % mfccs.mean())
-print('var: %.2f' % mfccs.var())
-
-plt.figure(figsize=(16,6))
-librosa.display.specshow(mfccs,sr=sr, x_axis='time')
-
-
-chromagram = librosa.feature.chroma_stft(y, sr=sr, hop_length=512)
-
-plt.figure(figsize=(16,6))
-librosa.display.specshow(chromagram,x_axis='time', y_axis='chroma', hop_length=512)
-
-
-plt.show()
+xPadded = [zeros(numToPadFront,1,'like',x),x,zeros(numToPadBack,1,'like',x)];
